@@ -77,21 +77,21 @@ def calculate(s):
 class Age:
     def __init__(self, _id, events, selects):
         self._id = _id
-        self.events = events
-        self.selects = selects
+        self.event = events
+        self.select = selects
 
 
 class Event:
     def __init__(self, _id, event=None, is_rand=None, include=None, exclude=None, effect=None,
                  post_event=None, achieve=None):
         self._id = _id
-        self.event = event
-        self.is_rand = is_rand
-        self.include = include
-        self.exclude = exclude
-        self.effect = effect
-        self.postEvent = post_event
-        self.achieve = achieve
+        self.event = None
+        self.is_rand = None
+        self.include = None
+        self.exclude = None
+        self.effect = None
+        self.postEvent = None
+        self.achieve = None
 
         if event and effect:
             effect = effect.replace(" ", "").replace("，", ",").replace("｜", ",")
@@ -112,12 +112,41 @@ class Event:
             exclude = exclude.replace(" ", "")
             self.exclude = calculate(exclude)
 
-
     def __str__(self):
         return f"Event ID: {self._id}, Name: {self.event}, \
         Is Rand: {self.is_rand}, Include: {self.include}, Exclude: {self.exclude}, Effect: {self.effect}, \
         Post Event: {self.postEvent}, Achieve: {self.achieve}"
 
+
+class Select:
+    def __init__(self, _id, question=None, selections=None, include=None, exclude=None, effects=None):
+        self._id = _id
+        self.question = None
+        self.selections = None
+        self.include = None
+        self.exclude = None
+        self.effects = None
+
+        if question:
+            self.question = question.replace(" ", "").replace("[选择]", "")
+
+        if selections:
+            selections = selections.replace(" ", "").replace("|", "｜")
+            select_list = selections.split('｜')
+            self.selections = select_list
+            # self.selections = '["' + '","'.join(select_list) + '"]'
+
+        if include:
+            include = include.replace(" ", "")
+            self.include = calculate(include)
+
+        if exclude:
+            exclude = exclude.replace(" ", "")
+            self.exclude = calculate(exclude)
+
+    def __str__(self):
+        return f"Select ID: {self._id}, Question: {self.question}, Selections: {self.selections}, \
+        Include: {self.include}, Exclude: {self.exclude}, Effects: {self.effects}"
 
 
 def get_age_events_map(file):
@@ -189,9 +218,9 @@ def parse_events(file):
         for line in f:
             # 分割行内容，获取第一列的值
             values = line.strip().split('\t')
-            if len(values) < 1:
+            if len(values) < 2:
                 continue
-            _id = values[0]
+            _id = int(values[0])
             event = None
             is_rand = None
             include = None
@@ -223,20 +252,58 @@ def parse_events(file):
     return event_list
 
 
+def parse_selects(file):
+    # 打开文件
+    with open(file, 'r', encoding='utf-8') as f:
+        # 读取表头并丢弃
+        f.readline()
+        # select list
+        select_list = []
+        # 逐行读取文件内容
+        for line in f:
+            # 分割行内容，获取第一列的值
+            values = line.strip().split('\t')
+            if len(values) < 2:
+                continue
+            _id = int(values[0])
+            include = None
+            exclude = None
+            effect = None
+            if len(values) > 2:
+                if "[选择]" not in values[1]:
+                    continue
+                else:
+                    question = values[1]
+                    selections = values[2]
+                if len(values) > 4:
+                    include = values[4]
+                if len(values) > 5:
+                    exclude = values[5]
+                if len(values) > 6:
+                    effect = values[6]
+                select_list.append(Select(_id, question, selections, include, exclude, effect))
+                # print(Select(_id, question, selections, include, exclude, effect))
+
+    # 输出集合
+    return select_list
+
+
 def remove_none(obj):
     return {k: v for k, v in obj.__dict__.items() if v is not None}
 
 
 def dump_json_file(data_list, file):
     with open(file, "w", encoding='utf-8') as f:
-        json.dump([dict(filter(lambda x: x[1] is not None, data.__dict__.items())) for data in data_list], f, ensure_ascii=False)
+        json.dump([dict(filter(lambda x: x[1] is not None, data.__dict__.items())) for data in data_list],
+                  f, ensure_ascii=False)
 
 
 # Press the green button in the gutter to run the script.
 if __name__ == '__main__':
-    # age_events_map = get_age_events_map('./age')
-    # selects_set = get_selects_set('./event')
-    # dump_age_file(get_age_list(age_events_map, selects_set))
+    age_events_map = get_age_events_map('./age')
+    selects_set = get_selects_set('./event')
+    dump_json_file(get_age_list(age_events_map, selects_set), "./ages.json")
     dump_json_file(parse_events('./event'), "./event.json")
+    dump_json_file(parse_selects('./event'), "./select.json")
 
 # See PyCharm help at https://www.jetbrains.com/help/pycharm/
